@@ -1,0 +1,158 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Resume {
+  id              String   @id @default(cuid())
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  isTreated       Int      @default(0) @map("is_treated") // BOOLEAN: 0=false, 1=true
+  color           String // Couleur CV (hex) - palette imposée
+  formationSystem String   @map("formation_system") // 4-3-3 ou 3-5-2, max 10 caractères
+
+  // Relations 1:1
+  playerProfile PlayerProfile?
+  contact       Contact?
+
+  // Relations 1:N
+  careerSeasons   CareerSeason[]
+  trainingEntries TrainingEntry[]
+  clubInterests   ClubInterest[]
+
+  @@map("resumes")
+}
+
+model PlayerProfile {
+  id                    String  @id @default(cuid())
+  resumeId              String  @unique @map("resume_id")
+  firstName             String  @map("first_name") // Max 100 caractères
+  lastName              String  @map("last_name") // Max 100 caractères
+  birthDate             String  @map("birth_date") // Format ISO date
+  nationalities         String // JSON Array des nationalités
+  strongFoot            String  @map("strong_foot") // Droit / Gauche / Ambidextre, max 20 car.
+  heightCm              Int     @map("height_cm")
+  weightKg              Int     @map("weight_kg")
+  mainPosition          String  @map("main_position") // Position principale, max 100 car.
+  positions             String // JSON Array : ["GB", "DG", "DC", "DD", "MDC", "MC", "MOC", "AG", "AD", "BU", "Piston G", "Piston D"]
+  qualities             String // JSON Array des qualités (max 6, 24 car. chacune)
+  vma                   Float?
+  wingspanCm            Int?    @map("wingspan_cm") // Uniquement gardiens
+  statsUrl              String? @map("stats_url") // URL Transfermarkt ou stats
+  videoUrl              String? @map("video_url") // Lien vidéo sportive
+  photoPath             String  @map("photo_path") // Crop carré obligatoire, max 255 car.
+  isInternational       Int     @default(0) @map("is_international") // BOOLEAN: Joueur international
+  internationalCountry  String? @map("international_country") // Pays de sélection, max 100 car.
+  internationalDivision String? @map("international_division") // Texte libre : U17, U19, Séniors, max 50 car.
+
+  // Relation
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@map("player_profiles")
+}
+
+model Contact {
+  id          String  @id @default(cuid())
+  resumeId    String  @unique @map("resume_id")
+  playerEmail String  @map("player_email") // Max 255 caractères
+  playerPhone String  @map("player_phone") // Format international, max 20 car.
+  agentEmail  String? @map("agent_email") // Max 255 caractères
+  agentPhone  String? @map("agent_phone") // Max 20 caractères
+
+  // Relation
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@map("contacts")
+}
+
+model CareerSeason {
+  id           String @id @default(cuid())
+  resumeId     String @map("resume_id")
+  startYear    Int    @map("start_year") // Année de début de saison
+  endYear      Int    @map("end_year") // Année de fin de saison
+  displayOrder Int    @map("display_order") // 1-5, max 5 saisons
+
+  // Relations
+  resume      Resume       @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  careerClubs CareerClub[]
+
+  @@map("career_seasons")
+}
+
+model Division {
+  id           String   @id @default(cuid())
+  divisionName String   @map("division_name") // Nom de la division, max 100 car.
+  logoUrl      String?  @map("logo_url") // URL vers le logo (optionnel), max 500 car.
+  isOfficial   Int      @default(0) @map("is_official") // BOOLEAN: 1=officielle, 0=custom
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  careerClubs CareerClub[]
+
+  @@index([divisionName], name: "idx_division_name")
+  @@map("divisions")
+}
+
+model CareerClub {
+  id                 String  @id @default(cuid())
+  seasonId           String  @map("season_id")
+  divisionId         String  @map("division_id") // Référence à la division
+  clubName           String  @map("club_name") // Max 200 caractères
+  clubLogoUrl        String? @map("club_logo_url") // URL du logo du club (optionnel)
+  category           String // Texte libre : U17, U19, Séniors, max 50 car.
+  startMonth         Int?    @map("start_month") // Si multi-club dans saison (1-12)
+  endMonth           Int?    @map("end_month") // Si multi-club dans saison (1-12)
+  isCaptain          Int     @default(0) @map("is_captain") // BOOLEAN: Badge capitanat
+  isPromoted         Int     @default(0) @map("is_promoted") // BOOLEAN: Badge surclassé
+  isChampion         Int     @default(0) @map("is_champion") // BOOLEAN: Badge champion
+  isCupWinner        Int     @default(0) @map("is_cup_winner") // BOOLEAN: Badge coupe remportée
+  matchesPlayed      Int     @map("matches_played") // Obligatoire (saison terminée)
+  goals              Int? // Joueur de champ
+  assists            Int? // Joueur de champ
+  avgPlaytimeMinutes Int?    @map("avg_playtime_minutes") // 1-90 min
+  cleanSheets        Int?    @map("clean_sheets") // Gardiens uniquement
+
+  // Relations
+  season   CareerSeason @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  division Division     @relation(fields: [divisionId], references: [id])
+
+  @@map("career_clubs")
+}
+
+model TrainingEntry {
+  id           String  @id @default(cuid())
+  resumeId     String  @map("resume_id")
+  startYear    Int     @map("start_year") // Année de début
+  endYear      Int?    @map("end_year") // Année de fin (null si en cours)
+  location     String // Lieu de la formation, max 200 car.
+  title        String // Titre/structure, max 1000 car.
+  details      String? // Détails optionnels, max 1000 car.
+  displayOrder Int     @map("display_order")
+
+  // Relation
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@map("training_entries")
+}
+
+model ClubInterest {
+  id           String  @id @default(cuid())
+  resumeId     String  @map("resume_id")
+  clubName     String  @map("club_name") // Max 200 caractères
+  clubLogoUrl  String? @map("club_logo_url") // URL du logo du club (optionnel)
+  year         String // 4 caractères exactement
+  displayOrder Int     @map("display_order")
+
+  // Relations
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@map("club_interests")
+}
