@@ -24,8 +24,10 @@ export interface ContactInput {
  * Club dans une saison de carrière
  */
 export interface CareerClubInput {
+  id?: string; // Identifiant pour mise à jour partielle
   division_id?: string; // Référence à la division (si division existe déjà)
   division_name?: string; // Nom de la division (si division n'existe pas, sera créée automatiquement)
+  division_logo_url?: string | null; // URL du logo de la division (optionnel, met à jour le logo si fourni)
   club_name: string; // Max 200 caractères
   club_logo_url?: string | null; // URL du logo du club (optionnel)
   category: string; // Max 50 caractères (U17, U19, Séniors, etc.)
@@ -46,6 +48,7 @@ export interface CareerClubInput {
  * Saison de carrière (max 5)
  */
 export interface CareerSeasonInput {
+  id?: string; // Identifiant pour mise à jour partielle
   start_year: number; // Année de début
   end_year: number; // Année de fin
   display_order: number; // 1-5
@@ -56,6 +59,7 @@ export interface CareerSeasonInput {
  * Entrée de formation
  */
 export interface TrainingEntryInput {
+  id?: string; // Identifiant pour mise à jour partielle
   start_year: number; // Année de début
   end_year?: number | null; // Année de fin (null si en cours)
   location: string; // Max 200 caractères
@@ -68,6 +72,7 @@ export interface TrainingEntryInput {
  * Intérêt pour un club
  */
 export interface ClubInterestInput {
+  id?: string; // Identifiant pour mise à jour partielle
   club_name: string; // Max 200 caractères
   club_logo_url?: string | null; // URL du logo du club (optionnel)
   year: string; // 4 caractères
@@ -209,4 +214,34 @@ export interface ResumeListItem {
   main_position: string;
   created_at: string; // Date de soumission
   is_treated: number; // 0 ou 1
+}
+
+/**
+ * Type pour la mise à jour partielle d'un CV
+ * Tous les champs sont optionnels - seuls les champs fournis seront mis à jour
+ */
+export interface PartialPlayerSubmissionInput {
+  // CV de base
+  resume?: {
+    color?: string; // Format hex (#RRGGBB)
+    formation_system?: string; // '4-3-3' ou '3-5-2', max 10 caractères
+  };
+  
+  // Profil joueur (tous les champs optionnels)
+  player_profile?: Partial<Omit<CreatePlayerInput, 'resume_id'>>;
+  
+  // Contacts (tous les champs optionnels)
+  contacts?: Partial<ContactInput>;
+  
+  // Qualités (max 6) - si fourni, remplace complètement la liste
+  qualities?: QualityInput[];
+  
+  // Carrière (max 5 saisons) - si fourni, remplace complètement la liste
+  career_seasons?: CareerSeasonInput[];
+  
+  // Formations - si fourni, remplace complètement la liste
+  training_entries?: TrainingEntryInput[];
+  
+  // Intérêts clubs - si fourni, remplace complètement la liste
+  club_interests?: ClubInterestInput[];
 }

@@ -3,7 +3,8 @@
  */
 
 import { prisma } from '@/lib/prisma';
-import type { PlayerSubmissionInput, CompleteResumeResponse, ResumeListItem } from '@/types/submission';
+import type { PlayerSubmissionInput, PartialPlayerSubmissionInput, CompleteResumeResponse, ResumeListItem } from '@/types/submission';
+import { upsertCareerClub, upsertTrainingEntry, upsertClubInterest } from './resume-helpers';
 
 /**
  * Crée un CV complet avec toutes ses relations
@@ -76,13 +77,22 @@ export async function createCompleteResume(
         for (const club of season.clubs) {
           // Gérer la division : trouver ou créer
           let divisionId: string;
+          let division: any;
           
           if (club.division_id) {
             // Utiliser la division existante
-            divisionId = club.division_id;
+            division = await tx.division.findUnique({
+              where: { id: club.division_id },
+            });
+            
+            if (!division) {
+              throw new Error(`Division avec l'ID "${club.division_id}" non trouvée`);
+            }
+            
+            divisionId = division.id;
           } else if (club.division_name) {
             // Chercher une division existante avec ce nom
-            let division = await tx.division.findFirst({
+            division = await tx.division.findFirst({
               where: {
                 divisionName: club.division_name,
               },
@@ -93,9 +103,15 @@ export async function createCompleteResume(
               division = await tx.division.create({
                 data: {
                   divisionName: club.division_name,
-                  logoUrl: null,
+                  logoUrl: club.division_logo_url ?? null,
                   isOfficial: 0, // Division custom par défaut
                 },
+              });
+            } else if (club.division_logo_url !== undefined) {
+              // Mettre à jour le logo si fourni
+              division = await tx.division.update({
+                where: { id: division.id },
+                data: { logoUrl: club.division_logo_url ?? null },
               });
             }
             
@@ -104,6 +120,14 @@ export async function createCompleteResume(
             throw new Error(
               `Division manquante pour le club "${club.club_name}"`
             );
+          }
+
+          // Si division_logo_url est fourni avec division_id, mettre à jour le logo
+          if (club.division_id && club.division_logo_url !== undefined) {
+            await tx.division.update({
+              where: { id: divisionId },
+              data: { logoUrl: club.division_logo_url ?? null },
+            });
           }
 
           // Créer le club de carrière
@@ -343,6 +367,251 @@ export async function updateResumeTreatmentStatus(
     await prisma.resume.update({
       where: { id: resumeId },
       data: { isTreated: isTreated ? 1 : 0 },
+    });
+    return true;
+  } catch (error: any) {
+    // P2025 = record not found
+    if (error?.code === 'P2025') {
+      return false;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Met à jour un CV complet ou partiel avec toutes ses relations
+ */
+export async function updateCompleteResume(
+  resumeId: string,
+  data: PlayerSubmissionInput | PartialPlayerSubmissionInput
+): Promise<boolean> {
+  return await prisma.$transaction(async (tx) => {
+    // Vérifier que le CV existe
+    const existingResume = await tx.resume.findUnique({
+      where: { id: resumeId },
+      include: {
+        playerProfile: true,
+        contact: true,
+      },
+    });
+
+    if (!existingResume) {
+      throw new Error(`CV ${resumeId} non trouvé`);
+    }
+
+    if (!existingResume.playerProfile || !existingResume.contact) {
+      throw new Error(`CV ${resumeId} incomplet: profil joueur ou contacts manquants`);
+    }
+
+    // 1. Mettre à jour le CV de base
+    if (data.resume) {
+      const resumeUpdateData: { color?: string; formationSystem?: string } = {};
+      if (data.resume.color !== undefined) resumeUpdateData.color = data.resume.color;
+      if (data.resume.formation_system !== undefined) resumeUpdateData.formationSystem = data.resume.formation_system;
+
+      if (Object.keys(resumeUpdateData).length > 0) {
+        await tx.resume.update({
+          where: { id: resumeId },
+          data: resumeUpdateData,
+        });
+      }
+    }
+
+    // 2. Mettre à jour le profil joueur
+    if (data.player_profile || data.qualities !== undefined) {
+      const profileUpdateData: any = {};
+
+      if (data.player_profile) {
+        if (data.player_profile.first_name !== undefined) profileUpdateData.firstName = data.player_profile.first_name;
+        if (data.player_profile.last_name !== undefined) profileUpdateData.lastName = data.player_profile.last_name;
+        if (data.player_profile.birth_date !== undefined) profileUpdateData.birthDate = data.player_profile.birth_date;
+        if (data.player_profile.nationalities !== undefined) profileUpdateData.nationalities = JSON.stringify(data.player_profile.nationalities || []);
+        if (data.player_profile.strong_foot !== undefined) profileUpdateData.strongFoot = data.player_profile.strong_foot;
+        if (data.player_profile.height_cm !== undefined) profileUpdateData.heightCm = data.player_profile.height_cm;
+        if (data.player_profile.weight_kg !== undefined) profileUpdateData.weightKg = data.player_profile.weight_kg;
+        if (data.player_profile.main_position !== undefined) profileUpdateData.mainPosition = data.player_profile.main_position;
+        if (data.player_profile.positions !== undefined) profileUpdateData.positions = JSON.stringify(data.player_profile.positions || []);
+        if (data.player_profile.vma !== undefined) profileUpdateData.vma = data.player_profile.vma ?? null;
+        if (data.player_profile.wingspan_cm !== undefined) profileUpdateData.wingspanCm = data.player_profile.wingspan_cm ?? null;
+        if (data.player_profile.stats_url !== undefined) profileUpdateData.statsUrl = data.player_profile.stats_url ?? null;
+        if (data.player_profile.video_url !== undefined) profileUpdateData.videoUrl = data.player_profile.video_url ?? null;
+        if (data.player_profile.photo_path !== undefined) profileUpdateData.photoPath = data.player_profile.photo_path;
+        if (data.player_profile.is_international !== undefined) profileUpdateData.isInternational = data.player_profile.is_international ?? 0;
+        if (data.player_profile.international_country !== undefined) profileUpdateData.internationalCountry = data.player_profile.international_country ?? null;
+        if (data.player_profile.international_division !== undefined) profileUpdateData.internationalDivision = data.player_profile.international_division ?? null;
+      }
+
+      if (data.qualities !== undefined) {
+        profileUpdateData.qualities = JSON.stringify(data.qualities || []);
+      }
+
+      if (Object.keys(profileUpdateData).length > 0) {
+        await tx.playerProfile.update({
+          where: { id: existingResume.playerProfile.id },
+          data: profileUpdateData,
+        });
+      }
+    }
+
+    // 3. Mettre à jour les contacts
+    if (data.contacts) {
+      const contactUpdateData: any = {};
+      if (data.contacts.player_email !== undefined) contactUpdateData.playerEmail = data.contacts.player_email;
+      if (data.contacts.player_phone !== undefined) contactUpdateData.playerPhone = data.contacts.player_phone;
+      if (data.contacts.agent_email !== undefined) contactUpdateData.agentEmail = data.contacts.agent_email ?? null;
+      if (data.contacts.agent_phone !== undefined) contactUpdateData.agentPhone = data.contacts.agent_phone ?? null;
+
+      if (Object.keys(contactUpdateData).length > 0) {
+        await tx.contact.update({
+          where: { id: existingResume.contact.id },
+          data: contactUpdateData,
+        });
+      }
+    }
+
+    // 4. Mettre à jour les saisons de carrière
+    if (data.career_seasons !== undefined) {
+      const existingSeasons = await tx.careerSeason.findMany({
+        where: { resumeId },
+        include: { 
+          careerClubs: {
+            include: { division: true }
+          }
+        },
+      });
+
+      const seasonById = new Map(existingSeasons.map((s) => [s.id, s]));
+
+      for (const season of data.career_seasons) {
+        const existingSeason = season.id ? seasonById.get(season.id) : null;
+
+        if (existingSeason) {
+          // Mettre à jour la saison existante
+          const seasonUpdateData: any = {};
+          if (season.start_year !== undefined) seasonUpdateData.startYear = season.start_year;
+          if (season.end_year !== undefined) seasonUpdateData.endYear = season.end_year;
+          if (season.display_order !== undefined) seasonUpdateData.displayOrder = season.display_order;
+
+          if (Object.keys(seasonUpdateData).length > 0) {
+            await tx.careerSeason.update({
+              where: { id: existingSeason.id },
+              data: seasonUpdateData,
+            });
+          }
+
+          // Mettre à jour les clubs de la saison
+          if (season.clubs !== undefined) {
+            const clubById = new Map(existingSeason.careerClubs.map((c) => [c.id, c]));
+
+            for (const club of season.clubs) {
+              const existingClub = club.id ? (clubById.get(club.id) ?? null) : null;
+              await upsertCareerClub(
+                tx, 
+                existingSeason.id, 
+                club, 
+                existingClub ? { id: existingClub.id, divisionId: existingClub.divisionId } : null
+              );
+            }
+          }
+        } else {
+          // Créer une nouvelle saison
+          if (
+            season.start_year === undefined ||
+            season.end_year === undefined ||
+            season.display_order === undefined
+          ) {
+            throw new Error('start_year, end_year et display_order sont requis pour créer une saison');
+          }
+
+          const createdSeason = await tx.careerSeason.create({
+            data: {
+              resumeId,
+              startYear: season.start_year,
+              endYear: season.end_year,
+              displayOrder: season.display_order,
+            },
+          });
+
+          // Créer les clubs de la nouvelle saison
+          if (season.clubs && season.clubs.length > 0) {
+            for (const club of season.clubs) {
+              await upsertCareerClub(tx, createdSeason.id, club, null);
+            }
+          }
+        }
+      }
+    }
+
+    // 5. Mettre à jour les entrées de formation
+    if (data.training_entries !== undefined) {
+      const existingEntries = await tx.trainingEntry.findMany({
+        where: { resumeId },
+      });
+      const entryById = new Map(existingEntries.map((e) => [e.id, e]));
+
+      for (const entry of data.training_entries) {
+        const existingEntry = entry.id ? (entryById.get(entry.id) ?? null) : null;
+        await upsertTrainingEntry(tx, resumeId, entry, existingEntry);
+      }
+    }
+
+    // 6. Mettre à jour les intérêts pour les clubs
+    if (data.club_interests !== undefined) {
+      const existingInterests = await tx.clubInterest.findMany({
+        where: { resumeId },
+      });
+      const interestById = new Map(existingInterests.map((i) => [i.id, i]));
+
+      for (const interest of data.club_interests) {
+        const existingInterest = interest.id ? (interestById.get(interest.id) ?? null) : null;
+        await upsertClubInterest(tx, resumeId, interest, existingInterest);
+      }
+    }
+
+    return true;
+  });
+}
+
+/**
+ * Supprime un CV et toutes ses relations (cascade automatique)
+ */
+export async function deleteResume(resumeId: string): Promise<boolean> {
+  try {
+    // Vérifier que le CV existe
+    const resume = await prisma.resume.findUnique({
+      where: { id: resumeId },
+    });
+
+    if (!resume) {
+      return false;
+    }
+
+    // Supprimer le CV (les relations seront supprimées automatiquement grâce au cascade)
+    await prisma.resume.delete({
+      where: { id: resumeId },
+    });
+
+    return true;
+  } catch (error: any) {
+    // P2025 = record not found
+    if (error?.code === 'P2025') {
+      return false;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Met à jour le logo d'une division
+ */
+export async function updateDivisionLogo(
+  divisionId: string,
+  logoUrl: string
+): Promise<boolean> {
+  try {
+    await prisma.division.update({
+      where: { id: divisionId },
+      data: { logoUrl },
     });
     return true;
   } catch (error: any) {

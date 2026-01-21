@@ -38,7 +38,7 @@ export async function PATCH(
       );
     }
     
-    const success = resumeService.updateDivisionLogo(id, body.logo_url);
+    const success = await resumeService.updateDivisionLogo(id, body.logo_url);
     
     if (!success) {
       return NextResponse.json(
