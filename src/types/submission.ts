@@ -166,6 +166,7 @@ export interface CompleteResumeResponse {
       id: string;
       division_id: string;
       division_name: string;
+      division_logo_url?: string | null;
       club_name: string;
       club_logo_url?: string | null;
       category: string;

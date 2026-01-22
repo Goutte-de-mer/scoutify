@@ -8,24 +8,24 @@ import { FileText } from "lucide-react";
 const DownloadBtn = ({
   firstName,
   lastName,
+  resumeId,
 }: {
-  firstName: string;
-  lastName: string;
+  firstName?: string;
+  lastName?: string;
+  resumeId: string;
 }) => {
-  const [exists, setExists] = useState(false);
-  const documentName = `CV_${lastName.toUpperCase()}_${firstName.toUpperCase()}.pdf`;
+  // const [exists, setExists] = useState(false);
+  // const documentName = `CV_${lastName.toUpperCase()}_${firstName.toUpperCase()}.pdf`;
 
-  useEffect(() => {
-    checkCVExists(firstName, lastName).then(setExists);
-  }, [firstName, lastName]);
-  console.log(exists);
-  if (!exists) return null;
-
+  // useEffect(() => {
+  //   checkCVExists(firstName, lastName).then(setExists);
+  // }, [firstName, lastName]);
+  // console.log(exists);
+  // if (!exists) return null;
+  console.log(resumeId);
   return (
     <a
-      href={`/CVs/${documentName}`}
-      target="_blank"
-      rel="noopener noreferrer"
+      href={`/staff/cv/${resumeId}`}
       className="rounded-sm px-3 py-2 transition hover:bg-white/10"
     >
       <FileText size={16} />

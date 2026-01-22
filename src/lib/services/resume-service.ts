@@ -300,6 +300,7 @@ export async function getCompleteResume(
         id: club.id,
         division_id: club.divisionId,
         division_name: club.division.divisionName,
+        division_logo_url: club.division.logoUrl,
         club_name: club.clubName,
         club_logo_url: club.clubLogoUrl,
         category: club.category,

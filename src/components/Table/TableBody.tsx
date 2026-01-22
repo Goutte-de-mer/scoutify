@@ -11,7 +11,10 @@ interface TableBodyProps {
   searchQuery?: string;
 }
 
-const TableBody = ({ statusFilter = "all", searchQuery = "" }: TableBodyProps) => {
+const TableBody = ({
+  statusFilter = "all",
+  searchQuery = "",
+}: TableBodyProps) => {
   const [allResumes, setAllResumes] = useState<ResumesResponse["resumes"]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -48,7 +51,7 @@ const TableBody = ({ statusFilter = "all", searchQuery = "" }: TableBodyProps) =
         (r) =>
           r.last_name.toLowerCase().includes(query) ||
           r.first_name.toLowerCase().includes(query) ||
-          `${r.first_name} ${r.last_name}`.toLowerCase().includes(query)
+          `${r.first_name} ${r.last_name}`.toLowerCase().includes(query),
       );
     }
 
@@ -120,10 +123,7 @@ const TableBody = ({ statusFilter = "all", searchQuery = "" }: TableBodyProps) =
               >
                 <Eye size={16} />
               </Link>
-              <DownloadBtn
-                firstName={resume.first_name}
-                lastName={resume.last_name}
-              />
+              <DownloadBtn resumeId={resume.id} />
               <button className="px-3 py-2 text-red-400 hover:bg-red-500/10 hover:text-red-300">
                 <Trash size={16} />
               </button>
