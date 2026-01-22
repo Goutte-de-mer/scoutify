@@ -20,6 +20,7 @@
     "lucide-react": "^0.562.0",
     "next": "16.1.4",
     "pg": "^8.17.2",
+    "puppeteer": "^24.36.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-pdf": "^10.3.0"
@@ -33,9 +34,14 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.4",
-    "prisma": "^7.2.0",
+    "prettier": "^3.8.1",
+    "prettier-plugin-tailwindcss": "^0.7.2",
+    "prisma": "^6.19.2",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5"
-  }
+  },
+  "plugins": [
+    "prettier-plugin-tailwindcss"
+  ]
 }

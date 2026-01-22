@@ -2,14 +2,14 @@
  * Helpers pour la gestion des CVs
  */
 
-import type { Prisma } from '@prisma/client';
+import type { PrismaClient } from '../../../generated/prisma/client';
 import type { CareerClubInput, TrainingEntryInput, ClubInterestInput } from '@/types/submission';
 
 /**
  * Type pour le client de transaction Prisma
  */
 type PrismaTransaction = Omit<
-  Prisma.TransactionClient,
+  PrismaClient,
   '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
 >;
 
@@ -127,19 +127,35 @@ export async function upsertCareerClub(
     divisionId = await findOrCreateDivision(tx, club as CareerClubInput);
   }
 
-  const clubPayload = { ...buildCareerClubPayload(club), divisionId };
+  const clubPayload = buildCareerClubPayload(club);
 
   if (existingClub) {
-    if (Object.keys(clubPayload).length > 0) {
+    const updatePayload = { ...clubPayload, divisionId };
+    if (Object.keys(updatePayload).length > 0) {
       await tx.careerClub.update({
         where: { id: existingClub.id },
-        data: clubPayload,
+        data: updatePayload,
       });
     }
   } else {
+    // Validation des champs obligatoires pour la création
+    if (!club.club_name) {
+      throw new Error(`club_name est requis pour créer un nouveau club`);
+    }
+    if (!club.category) {
+      throw new Error(`category est requis pour créer un nouveau club`);
+    }
+    if (club.matches_played === undefined || club.matches_played === null) {
+      throw new Error(`matches_played est requis pour créer un nouveau club`);
+    }
+
     await tx.careerClub.create({
       data: {
         seasonId,
+        divisionId,
+        clubName: club.club_name,
+        category: club.category,
+        matchesPlayed: club.matches_played,
         ...clubPayload,
       },
     });
@@ -155,6 +171,25 @@ export async function upsertTrainingEntry(
   entry: Partial<TrainingEntryInput>,
   existingEntry: { id: string } | null
 ): Promise<void> {
+  // Valider que l'entrée n'est pas vide
+  if (
+    !entry.start_year ||
+    entry.start_year <= 0 ||
+    !entry.end_year ||
+    entry.end_year <= 0 ||
+    !entry.title?.trim() ||
+    !entry.location?.trim()
+  ) {
+    // Si l'entrée est vide et qu'elle existe, la supprimer
+    if (existingEntry) {
+      await tx.trainingEntry.delete({
+        where: { id: existingEntry.id },
+      });
+    }
+    // Ne pas créer/mettre à jour une entrée vide
+    return;
+  }
+
   const entryPayload: Record<string, any> = {};
   if (entry.start_year !== undefined) entryPayload.startYear = entry.start_year;
   if (entry.end_year !== undefined) entryPayload.endYear = entry.end_year ?? null;

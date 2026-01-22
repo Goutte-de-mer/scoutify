@@ -1,11 +1,47 @@
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap");
 @import "tailwindcss";
 
 @theme inline {
-  --font-base: 'Montserrat', sans-serif;
-  --color-primary: #ff9228;
+  --font-base: "Montserrat", sans-serif;
+  --color-primary: #ee9016;
 }
 
 body {
-  @apply font-base;
+  @apply font-base bg-black;
+}
+
+button {
+  @apply cursor-pointer;
+}
+
+.btn {
+  @apply cursor-pointer rounded-md px-4 py-2 transition active:scale-95;
+}
+
+.header {
+  @apply border-b border-gray-800 bg-zinc-900;
+}
+
+.inner-header {
+  @apply mx-auto flex max-w-7xl items-center justify-between px-6 py-4;
+}
+
+th {
+  @apply h-10 px-2 align-middle font-medium text-gray-300;
+}
+
+.input-base {
+  @apply w-full h-10 rounded-lg border-2 border-gray-300 bg-white px-2 py-1 text-black placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 focus:border-transparent;
+}
+
+.input-base-dark {
+  @apply w-full h-10 rounded-lg border-2 border-gray-600 bg-zinc-800 px-2 py-1 text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 focus:border-transparent;
+}
+
+.input-error {
+  @apply border-red-500 focus:border-red-500 focus:ring-red-500;
+}
+
+.input-color {
+  @apply h-11 w-20 rounded-lg border-2 border-gray-300 cursor-pointer bg-transparent;
 }

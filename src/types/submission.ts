@@ -225,6 +225,7 @@ export interface PartialPlayerSubmissionInput {
   resume?: {
     color?: string; // Format hex (#RRGGBB)
     formation_system?: string; // '4-3-3' ou '3-5-2', max 10 caractères
+    is_treated?: number; // 0 ou 1
   };
   
   // Profil joueur (tous les champs optionnels)
